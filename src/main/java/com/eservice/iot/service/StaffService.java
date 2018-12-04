@@ -85,8 +85,8 @@ public class StaffService {
      */
     private Long queryStartTime = 0L;
 
-    //@Autowired
-    //private MqttMessageHelper mqttMessageHelper;
+    @Autowired
+    private MqttMessageHelper mqttMessageHelper;
 
     private HashMap<String, DepartmentSignData> mDepartmentSignData = new HashMap<>();
 
@@ -100,6 +100,7 @@ public class StaffService {
     private static ArrayList<String> YINGBIN_DEVICE_LIST = new ArrayList<>();
     private static ArrayList<String> mMovingList = new ArrayList<>();
     private static ArrayList<VisitRecord> mSendVipList = new ArrayList<>();
+    private static ArrayList<String> CURRENT_ATTENDANCE = new ArrayList<>();
 
 
     public StaffService() {
@@ -118,7 +119,7 @@ public class StaffService {
     /**
      * 每秒查询一次考勤信息
      */
-    @Scheduled(initialDelay = 5000,fixedRate = 1000)
+    @Scheduled(initialDelay = 5000, fixedRate = 500)
     public void fetchSignInScheduled() {
         ///当员工列表数为0，或者已全部签核完成,以及当前处于程序初始化状态情况下，可以跳过不再去获取考勤数据
         boolean skip = staffList.size() <= 0 || tagService == null || !tagService.isTagInitialFinished();
@@ -136,7 +137,7 @@ public class StaffService {
     /**
      * 每分钟获取一次需要签到的员工信息
      */
-    @Scheduled(initialDelay = 3000,fixedRate = 1000)
+    @Scheduled(initialDelay = 3000, fixedRate = 1000)
     public void fetchStaffScheduled() {
         if (token == null && tokenService != null) {
             token = tokenService.getToken();
@@ -186,16 +187,16 @@ public class StaffService {
 
         logger.info("================ 下班未签出记录 ===============");
         if (staffSignInList != null && staffSignInList.size() > 0) {
-            for (VisitRecord item: staffSignInList) {
-                logger.info("姓名：{}， 时间：{}", item.getPerson().getPerson_information().getName(),formatter.format(new Date((long)item.getTimestamp()*1000)));
+            for (VisitRecord item : staffSignInList) {
+                logger.info("姓名：{}， 时间：{}", item.getPerson().getPerson_information().getName(), formatter.format(new Date((long) item.getTimestamp() * 1000)));
             }
             staffSignInList.clear();
         }
 
         logger.info("================ 下班记录 ===============");
         if (staffSignOutList != null && staffSignOutList.size() > 0) {
-            for (VisitRecord item: staffSignOutList) {
-                logger.info("姓名：{}， 下班时间：{}", item.getPerson().getPerson_information().getName(),formatter.format(new Date((long)item.getTimestamp()*1000)));
+            for (VisitRecord item : staffSignOutList) {
+                logger.info("姓名：{}， 下班时间：{}", item.getPerson().getPerson_information().getName(), formatter.format(new Date((long) item.getTimestamp() * 1000)));
             }
             staffSignOutList.clear();
         }
@@ -248,7 +249,7 @@ public class StaffService {
                         }
                     }
                 }
-                if(!staffList.equals(tmpList)) {
+                if (!staffList.equals(tmpList)) {
                     logger.info("Sign in department number: {}", mDepartmentSignData.size());
                     logger.info("The number of staff：{} ==> {}", staffList.size(), tmpList.size());
                     staffList = tmpList;
@@ -275,13 +276,13 @@ public class StaffService {
             }
             if (needSignIn && getAttencanceId(visitRecord) != null) {
                 //dataChanged = true;
-                if(mMovingList.size() < 3 && !initial) {
-                    if(!mMovingList.contains(getAttencanceId(visitRecord))) {
+                if (mMovingList.size() < 3 && !initial) {
+                    if (!mMovingList.contains(getAttencanceId(visitRecord))) {
                         mMovingList.add(getAttencanceId(visitRecord));
                     }
                 }
                 if (((long) visitRecord.getTimestamp() * 1000) >= Util.formatAttendanceTime(ATTENDANCE_BEGIN_TIME).getTime()
-                        && ((long)visitRecord.getTimestamp() * 1000) < Util.formatAttendanceTime(ATTENDANCE_END_TIME).getTime()) {
+                        && ((long) visitRecord.getTimestamp() * 1000) < Util.formatAttendanceTime(ATTENDANCE_END_TIME).getTime()) {
                     boolean exit = false;
                     for (int i = 0; i < staffSignInList.size() && !exit; i++) {
                         if (staffSignInList.get(i).getPerson().getPerson_id().equals(visitRecord.getPerson().getPerson_id())) {
@@ -346,7 +347,34 @@ public class StaffService {
                         staffSignOutList.set(existIndex, visitRecord);
                     }
                 } else {
-                    logger.info("Invalid attendance：{}; record time：{}", visitRecord.getPerson().getPerson_information().getName(), formatter.format(new Date((long)visitRecord.getTimestamp()*1000)));
+                    logger.info("Invalid attendance：{}; record time：{}", visitRecord.getPerson().getPerson_information().getName(), formatter.format(new Date((long) visitRecord.getTimestamp() * 1000)));
+                }
+                if(!initial) {
+                    if (!CURRENT_ATTENDANCE.contains(visitRecord.getPerson().getPerson_id())) {
+                        if(CURRENT_ATTENDANCE.size() >= 3) {
+                            CURRENT_ATTENDANCE.remove(0);
+                        }
+                        CURRENT_ATTENDANCE.add(visitRecord.getPerson().getPerson_id());
+                        if(mExecutor == null) {
+                            initExecutor();
+                        }
+                        mExecutor.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                //通过MQTT将员工签到信息发送至web端
+                                logger.warn("Send sign in staff to web, name ==> {}", visitRecord.getPerson().getPerson_information().getName());
+                                String tagId = getAttencanceId(visitRecord);
+                                String tagName = tagService.getTagName(tagId);
+                                if(!"".equals(tagName)) {
+                                    ArrayList<VisitRecord> tmp = new ArrayList<>();
+                                    tmp.add(visitRecord);
+                                    mqttMessageHelper.sendToClient("staff/sign_in", JSON.toJSONString(tmp));
+                                } else {
+                                    logger.warn("Can not find tag name by {}", tagId);
+                                }
+                            }
+                        });
+                    }
                 }
             }
 
@@ -375,8 +403,8 @@ public class StaffService {
                         }
                     }
                 } else {
-                    if(visitRecord.getTimestamp() - vipSignInList.get(index).getTimestamp() >= VIP_SHOW_TIME ) {
-                        vipSignInList.set(index,visitRecord);
+                    if (visitRecord.getTimestamp() - vipSignInList.get(index).getTimestamp() >= VIP_SHOW_TIME) {
+                        vipSignInList.set(index, visitRecord);
                         synchronized (StaffService.class) {
                             mSendVipList.add(visitRecord);
                         }
@@ -418,21 +446,7 @@ public class StaffService {
 //                }
                 logger.info("Record: {}, device : {}", visitRecord.getPerson().getPerson_information().getName(), visitRecord.getDevice_id());
             }
-//                mExecutor.execute(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        //通过MQTT将员工签到信息发送至web端
-//                        logger.warn("Send sign in staff to web, name ==> {}", visitRecord.getPerson().getPerson_information().getName());
-//                        DepartmentSignSendData sendData = new DepartmentSignSendData();
-//                        String tagId = getAttencanceId(visitRecord);
-//                        sendData.setTagId(tagId);
-//                        sendData.setCurrentNum(mDepartmentSignData.get(tagId).getCurrentRecordList().size());
-//                        sendData.setTotalNum(mDepartmentSignData.get(tagId).getTotalStaff().size());
-//                        ArrayList<DepartmentSignSendData> list = new ArrayList<>();
-//                        list.add(sendData);
-//                        mqttMessageHelper.sendToClient("staff/sign_in", JSON.toJSONString(list));
-//                    }
-//                });
+
 //            if (sendVipList.size() > 1) {
 //                for (VisitRecord item: sendVipList) {
 //                    mExecutor.execute(new Runnable() {
@@ -464,9 +478,9 @@ public class StaffService {
 //        ///考勤记录查询结束时间
         Long queryEndTime = System.currentTimeMillis() / 1000;
         //重启状态
-        if(startTime == Util.getDateStartTime().getTime() / 1000) {
-            if(queryEndTime > Util.formatAttendanceTime(ATTENDANCE_END_TIME).getTime()/1000) {
-                queryEndTime = Util.formatAttendanceTime(ATTENDANCE_END_TIME).getTime()/1000;
+        if (startTime == Util.getDateStartTime().getTime() / 1000) {
+            if (queryEndTime > Util.formatAttendanceTime(ATTENDANCE_END_TIME).getTime() / 1000) {
+                queryEndTime = Util.formatAttendanceTime(ATTENDANCE_END_TIME).getTime() / 1000;
             }
         }
         postParameters.put("end_timestamp", queryEndTime);

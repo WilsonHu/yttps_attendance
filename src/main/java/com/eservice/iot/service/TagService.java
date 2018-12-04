@@ -225,6 +225,16 @@ public class TagService {
         return mAllTagList;
     }
 
+    public String getTagName(String tagId) {
+        String tagName = "";
+        for (int i = 0; i < mAllTagList.size(); i++) {
+            if(mAllTagList.get(i).getTag_id().equals(tagId)) {
+                tagName = mAllTagList.get(i).getTag_name();
+            }
+        }
+        return tagName;
+    }
+
     public boolean isTagInitialFinished() {
         return TAG_INITIAL_FINISHED;
     }
