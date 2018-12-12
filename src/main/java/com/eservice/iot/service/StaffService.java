@@ -261,7 +261,8 @@ public class StaffService {
     private void processStaffSignInResponse(ArrayList<VisitRecord> records, boolean initial) {
         Collections.reverse(records);
         for (VisitRecord visitRecord : records) {
-            //HashSet<String> dataChangedSet = new HashSet<>();
+            ArrayList<VisitRecord> mSendList = new ArrayList<>();
+
             boolean dataChanged = false;
             List<String> tagList = visitRecord.getPerson().getTag_id_list();
             ///签到相关
@@ -351,29 +352,11 @@ public class StaffService {
                 }
                 if(!initial) {
                     if (!CURRENT_ATTENDANCE.contains(visitRecord.getPerson().getPerson_id())) {
-                        if(CURRENT_ATTENDANCE.size() >= 3) {
+                        if(CURRENT_ATTENDANCE.size() >= 5) {
                             CURRENT_ATTENDANCE.remove(0);
                         }
                         CURRENT_ATTENDANCE.add(visitRecord.getPerson().getPerson_id());
-                        if(mExecutor == null) {
-                            initExecutor();
-                        }
-                        mExecutor.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                //通过MQTT将员工签到信息发送至web端
-                                logger.warn("Send sign in staff to web, name ==> {}", visitRecord.getPerson().getPerson_information().getName());
-                                String tagId = getAttencanceId(visitRecord);
-                                String tagName = tagService.getTagName(tagId);
-                                if(!"".equals(tagName)) {
-                                    ArrayList<VisitRecord> tmp = new ArrayList<>();
-                                    tmp.add(visitRecord);
-                                    mqttMessageHelper.sendToClient("staff/sign_in", JSON.toJSONString(tmp));
-                                } else {
-                                    logger.warn("Can not find tag name by {}", tagId);
-                                }
-                            }
-                        });
+                        mSendList.add(visitRecord);
                     }
                 }
             }
@@ -412,29 +395,29 @@ public class StaffService {
                 }
             }
             //建立线程池发送钉钉
-//            if (mExecutor == null) {
-//                initExecutor();
-//            }
-//            if (dataChangedSet.size() > 0) {
-//                mExecutor.execute(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        //通过MQTT将员工签到信息发送至web端
-//                        logger.warn("Send sign in list to web, size ==> {}", dataChangedSet.size());
-//                        //ArrayList<DepartmentSignSendData> sendList = new ArrayList<>();
-//                        Iterator<String> iterator = dataChangedSet.iterator();
-//                        while (iterator.hasNext()) {
-//                            DepartmentSignSendData sendData = new DepartmentSignSendData();
-//                            String tagId = iterator.next();
-//                            sendData.setTagId(tagId);
-//                            sendData.setCurrentNum(mDepartmentSignData.get(tagId).getCurrentRecordList().size());
-//                            sendData.setTotalNum(mDepartmentSignData.get(tagId).getTotalStaff().size());
-//                            sendList.add(sendData);
-//                        }
-//                        mqttMessageHelper.sendToClient("staff/sign_in", JSON.toJSONString(sendList));
+            if(mSendList.size() > 0) {
+                if(mExecutor == null) {
+                    initExecutor();
+                }
+                mExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        //通过MQTT将员工签到信息发送至web端
+                        logger.warn("Send sign in staff to web, size ==> {}", mSendList.size() );
+//                    String tagId = getAttencanceId(visitRecord);
+//                    String tagName = tagService.getTagName(tagId);
+//                    if(!"".equals(tagName)) {
+//                        ArrayList<VisitRecord> tmp = new ArrayList<>();
+//                        tmp.add(visitRecord);
+//                        mqttMessageHelper.sendToClient("staff/sign_in", JSON.toJSONString(tmp));
+//                    } else {
+//                        logger.warn("Can not find tag name by {}", tagId);
 //                    }
-//                });
-//            }
+                        mqttMessageHelper.sendToClient("staff/sign_in", JSON.toJSONString(mSendList));
+                    }
+                });
+            }
+
             if (dataChanged) {
                 DepartmentSignSendData sendData = new DepartmentSignSendData();
                 String tagId = getAttencanceId(visitRecord);
