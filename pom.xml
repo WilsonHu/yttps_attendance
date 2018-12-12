@@ -93,6 +93,13 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/src/main/resources/jar/taobao-sdk-java.jar</systemPath>
         </dependency>
+        <dependency>
+            <groupId>org.apache</groupId>
+            <artifactId>mina</artifactId>
+            <version>20180816</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/src/main/resources/jar/mina-core-2.0.4.jar</systemPath>
+        </dependency>
     </dependencies>
 
     <build>

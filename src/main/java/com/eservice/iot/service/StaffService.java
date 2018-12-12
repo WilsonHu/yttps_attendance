@@ -489,9 +489,9 @@ public class StaffService {
         identity.add("STAFF");
         postParameters.put("identity_list", identity);
         //只获取指定考勤设备的过人记录
-        //postParameters.put("device_id_list", policyService.getmAttendDeviceIdList());
+        postParameters.put("device_id_list", surveillancePolicyService.getmAttendDeviceIdList());
         ///只获取指定考勤tag的过人记录
-        //postParameters.put("tag_id_list", policyService.getmAttendTagIdList());
+        postParameters.put("tag_id_list", surveillancePolicyService.getmAttendTagIdList());
 
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.CONTENT_TYPE, "application/json");
