@@ -74,7 +74,7 @@ public class DoorOpenService {
     /**
      * 允许的设备id以及对应控制器的IP
      */
-    private HashMap<String, String> allowDeviceDoorControlMap = new HashMap<>();
+    private HashMap<String, DoorController> allowDeviceDoorControlMap = new HashMap<>();
 
     /**
      * 最近一次的开门时间，1秒内同一扇门不重复开门
@@ -82,10 +82,10 @@ public class DoorOpenService {
     private HashMap<String, Integer> mRecentOpenTimeMap = new HashMap<>();
 
     private static final int DOOR_OPEN_MIN_TIME = 1;
-    /**
-     * 门禁控制器IP以及名称
-     */
-    private HashMap<String, String> deviceDoorNameMap = new HashMap<>();
+//    /**
+//     * 门禁控制器IP以及名称
+//     */
+//    private HashMap<String, String> deviceDoorNameMap = new HashMap<>();
 
     /**
      * 查询开始时间,单位为秒
@@ -101,11 +101,15 @@ public class DoorOpenService {
 
 //        allowDeviceDoorControlMap.put("10.250.62.201", "10.250.62.207");
 //        allowDeviceDoorControlMap.put("10.250.62.202", "10.250.62.207");
-        allowDeviceDoorControlMap.put("192.168.0.114", "192.168.0.150");
+        allowDeviceDoorControlMap.put("192.168.1.89", new DoorController("192.168.1.101", "123303940", "1"));
+        allowDeviceDoorControlMap.put("192.168.1.90", new DoorController("192.168.1.101", "123303940", "1"));
+
+        allowDeviceDoorControlMap.put("192.168.1.86", new DoorController("192.168.1.100", "123314874", "1"));
+        allowDeviceDoorControlMap.put("192.168.1.87", new DoorController("192.168.1.100", "123314874", "1"));
 
 //        deviceDoorNameMap.put("10.250.62.201", "m001-1号");
 //        deviceDoorNameMap.put("10.250.62.202", "m001-1号");
-        deviceDoorNameMap.put("192.168.0.114", "1");
+//        deviceDoorNameMap.put("192.168.0.114", "1");
 
         for (String deviceId : allowDeviceDoorControlMap.keySet()) {
             mRecentOpenTimeMap.put(deviceId, Integer.valueOf(String.valueOf(System.currentTimeMillis() / 1000)));
@@ -171,7 +175,7 @@ public class DoorOpenService {
                                         if (toOpen) {
                                             mRecentOpenTimeMap.put(record.getDevice_id(), record.getTimestamp());
                                             logger.info("Open the door ==> {} by [{}]", record.getDevice_id(), record.getPerson().getPerson_information().getName());
-                                            openDoor(allowDeviceDoorControlMap.get(record.getDevice_id()), deviceDoorNameMap.get(record.getDevice_id()));
+                                            openDoor(allowDeviceDoorControlMap.get(record.getDevice_id()));
                                         }
                                     }
                                     //以上一次抓拍到的时间作为下一次查询的开始时间
@@ -195,12 +199,12 @@ public class DoorOpenService {
         //openDoor("192.168.0.111", "m001-1号");
     }
 
-    private void openDoor(String doorControllerIP, String doorName) {
+    private void openDoor(DoorController doorController) {
         WgUdpCommShort pkt = new WgUdpCommShort();
-        pkt.CommOpen(doorControllerIP);
+        pkt.CommOpen(doorController.IP);
         pkt.functionID = (byte) 0x40;
-        pkt.iDevSn = Long.valueOf(CONTROLLER_SN);
-        pkt.data[0] =(byte) (Integer.valueOf(doorName) & 0xff);
+        pkt.iDevSn = Long.valueOf(doorController.SN);
+        pkt.data[0] =(byte) (Integer.valueOf(doorController.doorName) & 0xff);
         byte[] recvBuff = pkt.run();
         if (recvBuff != null) {
             if (WgUdpCommShort.getIntByByte(recvBuff[8]) == 1)
@@ -216,5 +220,16 @@ public class DoorOpenService {
         pkt.CommClose();
         pkt = null;
 
+    }
+
+    public class DoorController {
+        public String IP;
+        public String SN;
+        public String doorName;
+        DoorController(String IP, String SN, String doorName) {
+            this.IP = IP;
+            this.SN = SN;
+            this.doorName = doorName;
+        }
     }
 }
