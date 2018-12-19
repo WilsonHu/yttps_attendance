@@ -24,6 +24,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 
 
 /**
@@ -211,6 +212,18 @@ public class TagService {
         } else {
             return false;
         }
+    }
+
+    public String tagIdToName(List<String> ids) {
+        String result = "";
+        for (int i = 0; i < ids.size(); i++) {
+            if(i != ids.size() -1) {
+                result += getTagName(ids.get(i)) + "/";
+            } else {
+                result += getTagName(ids.get(i));
+            }
+        }
+        return result;
     }
 
     public ArrayList<String> getNotSignInTagIdList() {

@@ -537,6 +537,39 @@ public class StaffService {
         return tagId;
     }
 
+    public boolean deleteStaff(String id) {
+        boolean success = false;
+        if (token == null && tokenService != null) {
+            token = tokenService.getToken();
+        }
+        if (token != null) {
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.ACCEPT, "application/json");
+            headers.add("Authorization", token);
+            HttpEntity entity = new HttpEntity(headers);
+            try {
+                ResponseEntity<String> responseEntity = restTemplate.exchange(PARK_BASE_URL + "/staffs/" + id, HttpMethod.DELETE, entity, String.class);
+                if (responseEntity.getStatusCodeValue() == ResponseCode.OK) {
+                    String body = responseEntity.getBody();
+                    if (body != null) {
+                        ResponseModel responseModel = JSONObject.parseObject(body, ResponseModel.class);
+                        if(responseModel != null && responseModel.getRtn() == 0) {
+                            success = true;
+                        }
+                    }
+                }
+            } catch (HttpClientErrorException exception) {
+                if (exception.getStatusCode().value() == ResponseCode.TOKEN_INVALID) {
+                    token = tokenService.getToken();
+                    if (token != null) {
+                        deleteStaff(id);
+                    }
+                }
+            }
+        }
+        return success;
+    }
+
     private void initExecutor() {
         mExecutor = new ThreadPoolTaskExecutor();
         mExecutor.setCorePoolSize(10);
