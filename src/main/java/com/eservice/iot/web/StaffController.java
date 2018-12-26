@@ -9,6 +9,8 @@ import com.eservice.iot.service.TagService;
 import com.eservice.iot.service.VisitorService;
 import org.apache.poi.hssf.usermodel.*;
 import org.apache.poi.ss.usermodel.ClientAnchor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +39,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/staff")
 public class StaffController {
+    private final static Logger logger = LoggerFactory.getLogger(StaffController.class);
 
     @Resource
     private StaffService staffService;
@@ -135,30 +138,51 @@ public class StaffController {
         //在表中存放查询到的数据放入对应的列
         int index = 1;
         for (Staff staff : list) {
-            HSSFRow row = sheet.createRow(rowNum);
-            row.setHeight((short) 1000);
-            ByteArrayOutputStream byteArrayOut = new ByteArrayOutputStream();
-            String url = PARK_BASE_URL + "/image/" + staff.getFace_list().get(0).getFace_image_id();
-            BufferedImage image = null;
-            try {
-                image = ImageIO.read(new URL(url));
-                ImageIO.write(image, "jpg", byteArrayOut);
-                //anchor主要用于设置图片的属性
-                HSSFClientAnchor anchor = new HSSFClientAnchor(0, 0, 0, 0,(short) 0, index, (short) 1, index+1);
-                anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
-                patriarch.createPicture(anchor, wb.addPicture(byteArrayOut.toByteArray(), HSSFWorkbook.PICTURE_TYPE_JPEG));
-                index++;
-            } catch (IOException e) {
-                e.printStackTrace();
+            if(staff.getFace_list().size() > 0) {
+                HSSFRow row = sheet.createRow(rowNum);
+                row.setHeight((short) 1000);
+                ByteArrayOutputStream byteArrayOut = new ByteArrayOutputStream();
+                String url = PARK_BASE_URL + "/image/" + staff.getFace_list().get(0).getFace_image_id();
+                BufferedImage image = null;
+                try {
+                    image = ImageIO.read(new URL(url));
+                    ImageIO.write(image, "jpg", byteArrayOut);
+                    //anchor主要用于设置图片的属性
+                    HSSFClientAnchor anchor = new HSSFClientAnchor(0, 0, 0, 0,(short) 0, index, (short) 1, index+1);
+                    anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_AND_RESIZE);
+                    patriarch.createPicture(anchor, wb.addPicture(byteArrayOut.toByteArray(), HSSFWorkbook.PICTURE_TYPE_JPEG));
+                    index++;
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                //row.createCell(0).setCellValue(staff.getFace_list().get(0).getFace_image_id());
+                row.createCell(1).setCellValue(staff.getPersonInformation().getName());
+                row.createCell(2).setCellValue(staff.getPersonInformation().getId());
+                if(staff.getCard_numbers() != null) {
+                    row.createCell(3).setCellValue(listToString(staff.getCard_numbers()));
+                } else {
+                    row.createCell(3).setCellValue(staff.getPersonInformation().getCard_no());
+                }
+                row.createCell(4).setCellValue(tagService.tagIdToName(staff.getTag_id_list()));
+                rowNum++;
+            } else {
+                logger.warn("Face ID list is zero: {}", staff.getPersonInformation().getName());
             }
-            //row.createCell(0).setCellValue(staff.getFace_list().get(0).getFace_image_id());
-            row.createCell(1).setCellValue(staff.getPersonInformation().getName());
-            row.createCell(2).setCellValue(staff.getPersonInformation().getId());
-            row.createCell(3).setCellValue(staff.getPersonInformation().getCard_no());
-            row.createCell(4).setCellValue(tagService.tagIdToName(staff.getTag_id_list()));
-            rowNum++;
         }
     }
 
+    private String listToString(List<String> list) {
+        String result = "";
+        if(list != null && list.size() > 0) {
+            for (int i = 0; i < list.size(); i++) {
+                if(i != list.size() -1) {
+                    result += list.get(i) + " | ";
+                } else {
+                    result += list.get(i);
+                }
+            }
+        }
+        return result;
+    }
 
 }

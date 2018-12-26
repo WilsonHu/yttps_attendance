@@ -26,6 +26,8 @@ public class Staff {
     private String scene_image_id;
     @JsonProperty("staff_id")
     private String staffId;
+    @JsonProperty("card_numbers")
+    private List<String> card_numbers;
 
     public List<String> getTag_id_list() {
         return tag_id_list;
@@ -89,6 +91,14 @@ public class Staff {
 
     public void setStaffId(String staffId) {
         this.staffId = staffId;
+    }
+
+    public List<String> getCard_numbers() {
+        return card_numbers;
+    }
+
+    public void setCard_numbers(List<String> card_numbers) {
+        this.card_numbers = card_numbers;
     }
 
     /**
